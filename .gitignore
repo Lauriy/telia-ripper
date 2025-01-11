@@ -1,0 +1,5 @@
+/.ruff_cache/
+/.venv/
+/.env
+/*.mp4
+/*.m4a
