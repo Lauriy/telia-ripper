@@ -1,0 +1,87 @@
+{
+  "playable": {
+    "bookmarks": [],
+    "consumed": 5017,
+    "minPosition": 0,
+    "startPosition": 0,
+    "maxPosition": 5018,
+    "autoRepeat": false,
+    "streams": [
+      {
+        "audioTracks": [
+          {
+            "language": "est",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": true,
+            "isAccessibilityTrack": false
+          },
+          {
+            "language": "rus",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": false,
+            "isAccessibilityTrack": false
+          }
+        ],
+        "duration": 5018,
+        "sources": [
+          "https://hls-streamer-13-1.minutv.ee/a6ffa87656f21c160642bc9755e079cc_1736900425/vod_s_a/129/82305_v1/.mpd?start=0&stop=5018&qp=2",
+          "https://hls-streamer-13-2.minutv.ee/a6ffa87656f21c160642bc9755e079cc_1736900425/vod_s_a/129/82305_v1/.mpd?start=0&stop=5018&qp=2"
+        ],
+        "textTracks": [],
+        "type": "multiformat_dash",
+        "validUntil": "2025-01-15T02:20:25+02:00",
+        "capability": "dynamic",
+        "thumbnails": {
+          "type": "scalstrm",
+          "startAt": 0,
+          "endAt": 5018
+        }
+      },
+      {
+        "audioTracks": [
+          {
+            "language": "est",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": true,
+            "isAccessibilityTrack": false
+          },
+          {
+            "language": "rus",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": false,
+            "isAccessibilityTrack": false
+          }
+        ],
+        "duration": 5018,
+        "sources": [
+          "https://hls-streamer-13-2.minutv.ee/a6ffa87656f21c160642bc9755e079cc_1736900425/vod_s_a/129/82305_v1/.m3u8?start=0&stop=5018&qp=2",
+          "https://hls-streamer-13-1.minutv.ee/a6ffa87656f21c160642bc9755e079cc_1736900425/vod_s_a/129/82305_v1/.m3u8?start=0&stop=5018&qp=2"
+        ],
+        "textTracks": [],
+        "type": "multiformat_hls",
+        "validUntil": "2025-01-15T02:20:25+02:00",
+        "capability": "dynamic",
+        "thumbnails": {
+          "type": "scalstrm",
+          "startAt": 0,
+          "endAt": 5018
+        }
+      }
+    ],
+    "drmProfile": "axinom",
+    "drm": {
+      "fairplayCertificateUri": "https://www.teliatv.ee/cert/fairplay.cer",
+      "widevine": "https://api.teliatv.ee/dtv-api/3.0/et/drm-license/widevine/vod_asset/82305",
+      "playready": "https://api.teliatv.ee/dtv-api/3.0/et/drm-license/playready/vod_asset/82305",
+      "fairplay": "https://api.teliatv.ee/dtv-api/3.0/et/drm-license/fairplay/vod_asset/82305"
+    }
+  }
+}

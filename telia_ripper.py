@@ -3,7 +3,7 @@ import subprocess
 from urllib.parse import urlparse
 import httpx
 from dotenv import load_dotenv
-import re
+import json
 
 load_dotenv()
 
@@ -46,30 +46,62 @@ def mix_files(title):
     )
 
 
-def get_decryption_key(content_id):
-    headers = {"Cookie": f"session={os.getenv('KEYSDB_SESSION')}"}
+def get_decryption_key(content_id, pssh):
+    print("\nGetting decryption key...")
 
-    payload = {
-        "license_url": f"{API_BASE_URL}/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
-        "headers": f"Cookie: PHPSESSID={os.getenv('SESSION_ID')};",
-        "pssh": os.getenv("PSSH"),
-        "buildInfo": "",
-        "proxy": "",
-        "force": False,
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
-    response = httpx.post("https://keysdb.net/wv", json=payload, headers=headers)
+    payload = {
+        "PSSH": pssh,
+        "License URL": f"{API_BASE_URL}/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
+        "Headers": "",
+        "JSON": "",
+        "Cookies": f'{{"PHPSESSID": "{os.getenv("SESSION_ID")}"}}',
+        "Data": "",
+        "Proxy": "",
+    }
 
-    if response.status_code != httpx.codes.OK:
-        print(f"Response content: {response.text}")
-        raise Exception(f"Failed to get key: {response.status_code}")
+    try:
+        response = httpx.post(
+            "https://cdrm-project.com/", json=payload, headers=headers
+        )
+        print(f"\nResponse status code: {response.status_code}")
+        print("\nResponse content:")
+        print(response.text)
 
-    content = response.text
-    key_match = re.search(r"Key: ([0-9a-f]+:[0-9a-f]+)", content)
-    if not key_match:
-        raise Exception("Could not find key in response")
+        if response.status_code == httpx.codes.OK:
+            print("\nParsing response as JSON...")
+            data = response.json()
+            print(f"Parsed JSON: {json.dumps(data, indent=2)}")
 
-    return key_match.group(1)
+            if "Message" not in data:
+                print("No Message field in response")
+                print(f"Response data: {data}")
+                raise Exception("Invalid response format")
+
+            key = data["Message"].strip()
+            if not key:
+                print("Empty key in response")
+                raise Exception("Empty key received")
+
+            if "error" in key.lower() or "not found" in key.lower():
+                print(f"Error in key response: {key}")
+                raise Exception(f"Key server error: {key}")
+
+            print(f"\nGot key: {key}")
+            return key
+        else:
+            print(f"Error response from key server: {response.status_code}")
+            print(f"Response content: {response.text}")
+            raise Exception(f"Key server error: {response.status_code}")
+    except Exception as e:
+        print(f"Error getting key: {e}")
+        raise
+
+    raise Exception("Failed to get decryption key")
 
 
 def get_stream_url(content_id):
@@ -82,16 +114,31 @@ def get_stream_url(content_id):
     if response.status_code != httpx.codes.OK:
         raise Exception(f"Failed to get stream info: {response.status_code}")
 
-    return response.json()["playable"]["streams"][1]["sources"][0]
+    data = response.json()
+    streams = data["playable"]["streams"]
+
+    # Find the DASH stream
+    dash_stream = next(
+        (stream for stream in streams if stream["type"] == "multiformat_dash"), None
+    )
+
+    if not dash_stream:
+        raise Exception("No DASH stream found")
+
+    return dash_stream["sources"][0]
 
 
 def get_stream_formats(stream_url):
+    print(f"\nGetting formats for stream URL: {stream_url}")
     result = subprocess.run(
         [YTDLP_PATH, "-F", "--allow-u", stream_url], capture_output=True, text=True
     )
 
     if result.returncode != 0:
+        print(f"Error output: {result.stderr}")
         raise Exception(f"Failed to get formats: {result.stderr}")
+
+    print(f"\nyt-dlp output:\n{result.stdout}")
 
     lines = result.stdout.split("\n")
     video_formats = []
@@ -106,21 +153,36 @@ def get_stream_formats(stream_url):
             continue
 
         format_id = parts[0]
+        print(f"Processing format: {format_id} - {line}")
 
-        if format_id.startswith("video="):
+        # Check if this is a video format
+        if "video only" in line:
             try:
-                bitrate = int(format_id.split("=")[1])
+                # Extract bitrate from TBR column
+                tbr = line.split("|")[1].strip().split("k")[0]
+                bitrate = int(tbr)
                 video_formats.append((bitrate, format_id))
-            except ValueError:
+                print(f"Found video format: {format_id} with bitrate {bitrate}")
+            except (ValueError, IndexError):
                 continue
-        elif format_id.startswith("audio_est="):
+        # Check if this is Estonian audio
+        elif "[est]" in line and "audio only" in line:
             audio_est = format_id
+            print(f"Found Estonian audio: {format_id}")
+
+    if not video_formats:
+        print("No video formats found!")
+    if not audio_est:
+        print("No Estonian audio found!")
 
     if not video_formats or not audio_est:
         raise ValueError("Could not find required video and audio formats")
 
     best_video = max(video_formats)[1]
-    
+    print("\nSelected formats:")
+    print(f"Video: {best_video}")
+    print(f"Audio: {audio_est}")
+
     return best_video, audio_est
 
 
@@ -163,7 +225,10 @@ def main():
             ]
         )
 
-    key = get_decryption_key(content_id)
+    if not check_files_exist(title):
+        raise Exception("Failed to download video and audio files")
+
+    key = get_decryption_key(content_id, os.getenv("PSSH"))
     decrypt_files(title, key)
     mix_files(title)
 
