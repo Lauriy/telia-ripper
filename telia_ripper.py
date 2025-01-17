@@ -130,9 +130,13 @@ def get_stream_url(content_id):
 
 def get_stream_formats(stream_url):
     print(f"\nGetting formats for stream URL: {stream_url}")
-    result = subprocess.run(
-        [YTDLP_PATH, "-F", "--allow-u", stream_url], capture_output=True, text=True
-    )
+    
+    args = [YTDLP_PATH, "-F", "--allow-u"]
+    if "ism/manifest" in stream_url:
+        args.extend(["--no-check-certificate"])
+    args.append(stream_url)
+    
+    result = subprocess.run(args, capture_output=True, text=True)
 
     if result.returncode != 0:
         print(f"Error output: {result.stderr}")
@@ -165,24 +169,23 @@ def get_stream_formats(stream_url):
                 print(f"Found video format: {format_id} with bitrate {bitrate}")
             except (ValueError, IndexError):
                 continue
-        # Check if this is Estonian audio
-        elif "[est]" in line and "audio only" in line:
+        elif "audio only" in line and ("audio_est=" in format_id or "[et]" in line or "[est]" in line):
             audio_est = format_id
             print(f"Found Estonian audio: {format_id}")
 
     if not video_formats:
         print("No video formats found!")
+        raise ValueError("Could not find video formats")
+        
     if not audio_est:
         print("No Estonian audio found!")
-
-    if not video_formats or not audio_est:
-        raise ValueError("Could not find required video and audio formats")
+        raise ValueError("Estonian audio track not available")
 
     best_video = max(video_formats)[1]
-    print("\nSelected formats:")
+    print(f"\nSelected formats:")
     print(f"Video: {best_video}")
     print(f"Audio: {audio_est}")
-
+    
     return best_video, audio_est
 
 
