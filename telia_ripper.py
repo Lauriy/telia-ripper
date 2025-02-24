@@ -46,62 +46,51 @@ def mix_files(title):
     )
 
 
-def get_decryption_key(content_id, pssh):
+def get_decryption_key(content_id: str, pssh: str) -> str:
     print("\nGetting decryption key...")
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
     payload = {
-        "PSSH": pssh,
-        "License URL": f"{API_BASE_URL}/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
-        "Headers": "",
-        "JSON": "",
-        "Cookies": f'{{"PHPSESSID": "{os.getenv("SESSION_ID")}"}}',
-        "Data": "",
-        "Proxy": "",
+        "pssh": pssh,
+        "licurl": f"https://api.teliatv.ee/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
+        "cookies": json.dumps({"PHPSESSID": os.getenv("SESSION_ID")}),
     }
 
     try:
         response = httpx.post(
-            "https://cdrm-project.com/", json=payload, headers=headers
+            "https://cdrm-project.com/api/decrypt", headers=headers, json=payload
         )
-        print(f"\nResponse status code: {response.status_code}")
-        print("\nResponse content:")
-        print(response.text)
+        response.raise_for_status()
 
-        if response.status_code == httpx.codes.OK:
-            print("\nParsing response as JSON...")
-            data = response.json()
-            print(f"Parsed JSON: {json.dumps(data, indent=2)}")
+        data = response.json()
+        print(f"\nResponse content: {data}")
 
-            if "Message" not in data:
-                print("No Message field in response")
-                print(f"Response data: {data}")
-                raise Exception("Invalid response format")
+        if "message" not in data:
+            raise ValueError("Invalid response format: 'message' field is missing")
 
-            key = data["Message"].strip()
-            if not key:
-                print("Empty key in response")
-                raise Exception("Empty key received")
+        key = data["message"].strip()
+        if not key:
+            raise ValueError("Empty key in response")
 
-            if "error" in key.lower() or "not found" in key.lower():
-                print(f"Error in key response: {key}")
-                raise Exception(f"Key server error: {key}")
+        if "error" in key.lower() or "not found" in key.lower():
+            raise ValueError(f"Key server error: {key}")
 
-            print(f"\nGot key: {key}")
-            return key
-        else:
-            print(f"Error response from key server: {response.status_code}")
-            print(f"Response content: {response.text}")
-            raise Exception(f"Key server error: {response.status_code}")
+        print(f"\nGot key: {key}")
+
+        return key
+
+    except httpx.RequestError as req_err:
+        print(f"Request error: {req_err}")
+        raise
+    except ValueError as val_err:
+        print(f"Value error: {val_err}")
+        raise
     except Exception as e:
         print(f"Error getting key: {e}")
         raise
-
-    raise Exception("Failed to get decryption key")
 
 
 def get_stream_url(content_id):
@@ -130,12 +119,12 @@ def get_stream_url(content_id):
 
 def get_stream_formats(stream_url):
     print(f"\nGetting formats for stream URL: {stream_url}")
-    
+
     args = [YTDLP_PATH, "-F", "--allow-u"]
     if "ism/manifest" in stream_url:
         args.extend(["--no-check-certificate"])
     args.append(stream_url)
-    
+
     result = subprocess.run(args, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -169,23 +158,25 @@ def get_stream_formats(stream_url):
                 print(f"Found video format: {format_id} with bitrate {bitrate}")
             except (ValueError, IndexError):
                 continue
-        elif "audio only" in line and ("audio_est=" in format_id or "[et]" in line or "[est]" in line):
+        elif "audio only" in line and (
+            "audio_est=" in format_id or "[et]" in line or "[est]" in line
+        ):
             audio_est = format_id
             print(f"Found Estonian audio: {format_id}")
 
     if not video_formats:
         print("No video formats found!")
         raise ValueError("Could not find video formats")
-        
+
     if not audio_est:
         print("No Estonian audio found!")
         raise ValueError("Estonian audio track not available")
 
     best_video = max(video_formats)[1]
-    print(f"\nSelected formats:")
+    print("\nSelected formats:")
     print(f"Video: {best_video}")
     print(f"Audio: {audio_est}")
-    
+
     return best_video, audio_est
 
 
