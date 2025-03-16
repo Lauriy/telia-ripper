@@ -1,9 +1,9 @@
 import os
 import subprocess
 from urllib.parse import urlparse
+
 import httpx
 from dotenv import load_dotenv
-import json
 
 load_dotenv()
 
@@ -54,33 +54,43 @@ def get_decryption_key(content_id: str, pssh: str) -> str:
     }
 
     payload = {
+        "license": f"https://api.teliatv.ee/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
+        "headers": f"Cookie: PHPSESSID={os.getenv('SESSION_ID')}",
         "pssh": pssh,
-        "licurl": f"https://api.teliatv.ee/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}",
-        "cookies": json.dumps({"PHPSESSID": os.getenv("SESSION_ID")}),
+        "buildInfo": "google/sdk_gphone_x86/generic_x86:8.1.0/OSM1.180201.037/6739391:userdebug/dev-keys",
+        "proxy": "",
+        "cache": True,
     }
 
     try:
         response = httpx.post(
-            "https://cdrm-project.com/api/decrypt", headers=headers, json=payload
+            "http://108.181.133.95:8080/wv", headers=headers, json=payload
         )
         response.raise_for_status()
 
-        data = response.json()
-        print(f"\nResponse content: {data}")
+        response_content = response.text
+        print(f"\nResponse content: {response_content}")
 
-        if "message" not in data:
-            raise ValueError("Invalid response format: 'message' field is missing")
+        if "SUCCESS" not in response_content:
+            raise ValueError("Invalid response format: 'SUCCESS' not found")
 
-        key = data["message"].strip()
-        if not key:
-            raise ValueError("Empty key in response")
+        import re
 
-        if "error" in key.lower() or "not found" in key.lower():
-            raise ValueError(f"Key server error: {key}")
+        match = re.search(
+            r'<li style="font-family:\'Courier\'">(.*?)</li>', response_content
+        )
+        if match:
+            key = match.group(1).strip()
+            print(f"\nGot key: {key}")
 
-        print(f"\nGot key: {key}")
+            if ":" not in key or len(key.split(":")) != 2:
+                raise ValueError(
+                    "Key format is invalid, must be in the form part1:part2"
+                )
 
-        return key
+            return key
+        else:
+            raise ValueError("Key not found in response")
 
     except httpx.RequestError as req_err:
         print(f"Request error: {req_err}")
