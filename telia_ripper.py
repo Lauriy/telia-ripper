@@ -13,6 +13,15 @@ FFMPEG_PATH = os.getenv("FFMPEG_PATH")
 API_BASE_URL = "https://api.teliatv.ee"
 
 
+def safe_delete_file(filepath):
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"Deleted: {filepath}")
+    except OSError as e:
+        print(f"Warning: Could not delete {filepath}: {e}")
+
+
 def extract_content_info(url):
     parsed = urlparse(url)
     path_parts = parsed.path.strip("/").split("/")
@@ -26,13 +35,37 @@ def check_files_exist(title):
     return os.path.exists(f"{title}.mp4") and os.path.exists(f"{title}.m4a")
 
 
+def check_dec_files_exist(title):
+    return os.path.exists(f"{title}-dec.mp4") and os.path.exists(f"{title}-dec.m4a")
+
+
+def check_final_file_exists(title):
+    return os.path.exists(f"{title}-final.mp4")
+
+
 def decrypt_files(title, key):
-    subprocess.run([MP4DECRYPT_PATH, "--key", key, f"{title}.mp4", f"{title}-dec.mp4"])
-    subprocess.run([MP4DECRYPT_PATH, "--key", key, f"{title}.m4a", f"{title}-dec.m4a"])
+    result_video = subprocess.run(
+        [MP4DECRYPT_PATH, "--key", key, f"{title}.mp4", f"{title}-dec.mp4"]
+    )
+    if result_video.returncode != 0:
+        raise Exception("Failed to decrypt video file")
+
+    result_audio = subprocess.run(
+        [MP4DECRYPT_PATH, "--key", key, f"{title}.m4a", f"{title}-dec.m4a"]
+    )
+    if result_audio.returncode != 0:
+        raise Exception("Failed to decrypt audio file")
+
+    if check_dec_files_exist(title):
+        print("Decryption successful, deleting original encrypted files...")
+        safe_delete_file(f"{title}.mp4")
+        safe_delete_file(f"{title}.m4a")
+    else:
+        raise Exception("Decrypted files not found after decryption")
 
 
 def mix_files(title):
-    subprocess.run(
+    result = subprocess.run(
         [
             FFMPEG_PATH,
             "-i",
@@ -44,6 +77,16 @@ def mix_files(title):
             f"{title}-final.mp4",
         ]
     )
+
+    if result.returncode != 0:
+        raise Exception("Failed to mix video and audio files")
+
+    if check_final_file_exists(title):
+        print("Mixing successful, deleting decrypted files...")
+        safe_delete_file(f"{title}-dec.mp4")
+        safe_delete_file(f"{title}-dec.m4a")
+    else:
+        raise Exception("Final file not found after mixing")
 
 
 def get_decryption_key(content_id: str, pssh: str) -> str:
@@ -198,6 +241,12 @@ def main():
     content_id, title = extract_content_info(url)
     print(f"Content ID: {content_id}, Title: {title}")
 
+    if check_final_file_exists(title):
+        print(
+            f"Final file {title}-final.mp4 already exists, skipping download and processing"
+        )
+        return
+
     if not check_files_exist(title):
         stream_url = get_stream_url(content_id)
         video_format, audio_format = get_stream_formats(stream_url)
@@ -205,7 +254,8 @@ def main():
         print(f"Video: {video_format}")
         print(f"Audio: {audio_format}")
 
-        subprocess.run(
+        print("Downloading video...")
+        result_video = subprocess.run(
             [
                 YTDLP_PATH,
                 "--allow-u",
@@ -217,7 +267,11 @@ def main():
             ]
         )
 
-        subprocess.run(
+        if result_video.returncode != 0:
+            raise Exception("Failed to download video")
+
+        print("Downloading audio...")
+        result_audio = subprocess.run(
             [
                 YTDLP_PATH,
                 "--allow-u",
@@ -225,9 +279,12 @@ def main():
                 audio_format,
                 stream_url,
                 "-o",
-                f"{title}.m4a",
+                f"./{title}.m4a",
             ]
         )
+
+        if result_audio.returncode != 0:
+            raise Exception("Failed to download audio")
 
     if not check_files_exist(title):
         raise Exception("Failed to download video and audio files")
@@ -235,6 +292,8 @@ def main():
     key = get_decryption_key(content_id, os.getenv("PSSH"))
     decrypt_files(title, key)
     mix_files(title)
+
+    print(f"\nProcess completed successfully! Final file: {title}-final.mp4")
 
 
 if __name__ == "__main__":

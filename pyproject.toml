@@ -1,6 +1,6 @@
 [project]
 name = "telia-ripper"
-version = "0.1.1"
+version = "0.1.2"
 description = "Tool for downloading and decrypting Telia video streams"
 requires-python = ">=3.13"
 dependencies = [
