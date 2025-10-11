@@ -1,0 +1,49 @@
+{
+  "playable": {
+    "bookmarks": [],
+    "consumed": 19,
+    "minPosition": 0,
+    "startPosition": 0,
+    "maxPosition": 6632,
+    "autoRepeat": false,
+    "streams": [
+      {
+        "audioTracks": [
+          {
+            "language": "est",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": false,
+            "isAccessibilityTrack": false
+          },
+          {
+            "language": "rus",
+            "channels": null,
+            "format": null,
+            "pid": null,
+            "original": false,
+            "isAccessibilityTrack": false
+          }
+        ],
+        "duration": 6632,
+        "sources": [
+          "https://hls-streamer-10-1.minutv.ee/aafe19ae73872a7afa5701c6dd35e3ed_1760210639web/vod/incredibles_the_bm_27763_hd_20180514_enc/index.m3u8?qp=2",
+          "https://hls-streamer-10-2.minutv.ee/aafe19ae73872a7afa5701c6dd35e3ed_1760210639web/vod/incredibles_the_bm_27763_hd_20180514_enc/index.m3u8?qp=2"
+        ],
+        "textTracks": [],
+        "type": "hls",
+        "validUntil": "2025-10-11T22:23:59+03:00",
+        "capability": "dynamic",
+        "maxResolution": null,
+        "thumbnails": {
+          "type": "classic",
+          "startAt": null,
+          "endAt": null
+        }
+      }
+    ],
+    "drmProfile": "classic",
+    "drm": null
+  }
+}
