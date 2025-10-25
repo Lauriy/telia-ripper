@@ -1,6 +1,7 @@
 /.idea/
 /.ruff_cache/
 /.venv/
+/.grok/
 /.env
 /*.mp4
 /*.m4a
