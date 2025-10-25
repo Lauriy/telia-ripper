@@ -1,0 +1,52 @@
+{
+  "sources": {
+    "HLS": [
+      {
+        "src": "//cdnlb.tvplayhome.lt/vod/eds/go3_svod/20201005T0813/80014337/_/GO3_SVOD_HLS/80014337.m3u8?cdntoken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjE0MzMyOTYsInBhdGgiOiIvdm9kL2Vkcy9nbzNfc3ZvZC8yMDIwMTAwNVQwODEzLzgwMDE0MzM3L18vR08zX1NWT0RfSExTLyIsInNpcCI6IjkwLjE5MS4zOC4xMTQiLCJkZXZpY2VfaWQiOiIxODUyMzQzMCIsInNlc3Npb25faWQiOiIwIiwiY2xpZW50X2lkIjoiNDcyMDQxMiIsIm1heF9zZXNzaW9ucyI6MTAsInNlc3Npb25fZHVyYXRpb24iOjg2NDAwfQ.O_fIkNwlK3YFPyDkJmwMc_lmDMjRaN28-QHnM_XSUw6dJlTjpaXgx9DCz-cUUnO8660wbFDCh4z6Pi9tZou24g",
+        "aspectWidth": 16,
+        "aspectHeight": 9,
+        "cert": "https://static3.go3.tv/file/go3/resources/cert/fairplay/amb.cer"
+      }
+    ],
+    "AZDIO_HLS": [
+      {
+        "src": "//cdnlb.tvplayhome.lt/vod/eds/go3_svod/20201005T0813/80014337/_/vHLS_VMX/80014337.m3u8?cdntoken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjE0MzMyOTYsInBhdGgiOiIvdm9kL2Vkcy9nbzNfc3ZvZC8yMDIwMTAwNVQwODEzLzgwMDE0MzM3L18vdkhMU19WTVgvIiwic2lwIjoiOTAuMTkxLjM4LjExNCIsImRldmljZV9pZCI6IjE4NTIzNDMwIiwic2Vzc2lvbl9pZCI6IjAiLCJjbGllbnRfaWQiOiI0NzIwNDEyIiwibWF4X3Nlc3Npb25zIjoxMCwic2Vzc2lvbl9kdXJhdGlvbiI6ODY0MDB9.E6NOcLMgsHYeTKS-eTM3VWkYk07aTCX4x9CMmlreFSCRFph6v6jtbnaeB1k6igOEyw8U6MRBNy3_clQuS81EpA",
+        "aspectWidth": 16,
+        "aspectHeight": 9
+      }
+    ],
+    "DASH": [
+      {
+        "src": "//cdnlb.tvplayhome.lt/vod/eds/go3_svod/20201005T0813/80014337/_/GO3_SVOD_DASH/80014337.mpd?cdntoken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjE0MzMyOTYsInBhdGgiOiIvdm9kL2Vkcy9nbzNfc3ZvZC8yMDIwMTAwNVQwODEzLzgwMDE0MzM3L18vR08zX1NWT0RfREFTSC8iLCJzaXAiOiI5MC4xOTEuMzguMTE0IiwiZGV2aWNlX2lkIjoiMTg1MjM0MzAiLCJzZXNzaW9uX2lkIjoiMCIsImNsaWVudF9pZCI6IjQ3MjA0MTIiLCJtYXhfc2Vzc2lvbnMiOjEwLCJzZXNzaW9uX2R1cmF0aW9uIjo4NjQwMH0.cCW48hPOuqQBkLiZRozwmY6nee7djVPEyg6H6auc6x-1TW1CqLnB5RaMjuPUOMH6uI1ByDDJb281Kjk3WZtv_A",
+        "aspectWidth": 16,
+        "aspectHeight": 9
+      }
+    ],
+    "SS": [
+      {
+        "src": "//cdnlb.tvplayhome.lt/vod/eds/go3_svod/20201005T0813/80014337/_/GO3_SVOD_SS.ism/Manifest?cdntoken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjE0MzMyOTYsInBhdGgiOiIvdm9kL2Vkcy9nbzNfc3ZvZC8yMDIwMTAwNVQwODEzLzgwMDE0MzM3L18vR08zX1NWT0RfU1MuaXNtLyIsInNpcCI6IjkwLjE5MS4zOC4xMTQiLCJkZXZpY2VfaWQiOiIxODUyMzQzMCIsInNlc3Npb25faWQiOiIwIiwiY2xpZW50X2lkIjoiNDcyMDQxMiIsIm1heF9zZXNzaW9ucyI6MTAsInNlc3Npb25fZHVyYXRpb24iOjg2NDAwfQ.LwxgU15xU-MecEELLopAFfcjfZjNIXmnBXxilTCr4gZBlq9mCvbhEiG_ZHNIeZRObIf1CY9bGhlNKeMTLIPBtA",
+        "aspectWidth": 16,
+        "aspectHeight": 9
+      }
+    ]
+  },
+  "drm": {
+    "FAIRPLAY": {
+      "src": "https://go3.tv/api/products/1022921/drm/fairplay?platform=BROWSER&type=MOVIE&tenant=OM_EE",
+      "cert": "https://static3.go3.tv/file/go3/resources/cert/fairplay/amb.cer"
+    },
+    "WIDEVINE": {
+      "src": "https://go3.tv/api/products/1022921/drm/widevine?platform=BROWSER&type=MOVIE&tenant=OM_EE"
+    },
+    "PLAYREADY": {
+      "src": "https://go3.tv/api/products/1022921/drm/playready?platform=BROWSER&type=MOVIE&tenant=OM_EE"
+    }
+  },
+  "item": {
+    "type_": "VOD",
+    "id": 1022921,
+    "type": "VOD",
+    "streamLocation": "DEFAULT",
+    "geolocked": false
+  }
+}

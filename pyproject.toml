@@ -1,7 +1,7 @@
 [project]
 name = "telia-ripper"
-version = "0.1.3"
-description = "Tool for downloading and decrypting Telia video streams"
+version = "0.2.0"
+description = "Tool for downloading and decrypting (Estonian) Telia/Go3 video streams"
 requires-python = ">=3.14"
 dependencies = [
     "httpx",
@@ -11,3 +11,5 @@ dependencies = [
 dev = [
     "ruff",
 ]
+[tool.ruff.lint]
+select = ["ALL"]
