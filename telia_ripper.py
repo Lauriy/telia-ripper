@@ -2,6 +2,7 @@ import glob
 import os
 import re
 import subprocess
+import time
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
@@ -120,8 +121,11 @@ def mix_files(title) -> None:
         raise Exception(msg)
 
 
-def get_pssh_from_mpd(stream_url: str) -> str:
-    headers = {"Cookie": f"JSESSIONID={os.getenv('GO3_SESSION_ID')}"}
+def get_pssh_from_mpd(stream_url: str, service: str) -> str:
+    if service == "go3":
+        headers = {"Cookie": f"JSESSIONID={os.getenv('GO3_SESSION_ID')}"}
+    else:
+        headers = {"Cookie": f"PHPSESSID={os.getenv('SESSION_ID')}"}
     response = httpx.get(stream_url, headers=headers)
     if response.status_code == 302:
         location = response.headers.get("Location")
@@ -146,7 +150,9 @@ def get_pssh_from_mpd(stream_url: str) -> str:
     return None
 
 
-def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
+def get_decryption_key(
+    content_id: str, pssh: str, service: str, retries: int = 3
+) -> str:
     headers = {
         "Content-Type": "application/json",
     }
@@ -170,43 +176,44 @@ def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
         "cache": True,
     }
 
-    try:
-        response = httpx.post(
-            "http://108.181.133.95:8080/wv",
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
+    last_error = None
+    for attempt in range(retries):
+        try:
+            response = httpx.post(
+                "http://108.181.133.95:8080/wv",
+                headers=headers,
+                json=payload,
+            )
+            response.raise_for_status()
 
-        response_content = response.text
+            response_content = response.text
 
-        if "SUCCESS" not in response_content:
-            msg = "Invalid response format: 'SUCCESS' not found"
+            if "SUCCESS" not in response_content:
+                msg = "Invalid response format: 'SUCCESS' not found"
+                raise ValueError(msg)
+
+            match = re.search(
+                r'<li style="font-family:\'Courier\'">(.*?)</li>',
+                response_content,
+            )
+            if match:
+                key = match.group(1).strip()
+
+                if ":" not in key or len(key.split(":")) != 2:
+                    msg = "Key format is invalid, must be in the form part1:part2"
+                    raise ValueError(msg)
+
+                return key
+            msg = "Key not found in response"
             raise ValueError(msg)
 
-        match = re.search(
-            r'<li style="font-family:\'Courier\'">(.*?)</li>',
-            response_content,
-        )
-        if match:
-            key = match.group(1).strip()
+        except (httpx.RequestError, ValueError) as e:
+            last_error = e
+            if attempt < retries - 1:
+                time.sleep(2)
+            continue
 
-            if ":" not in key or len(key.split(":")) != 2:
-                msg = "Key format is invalid, must be in the form part1:part2"
-                raise ValueError(
-                    msg,
-                )
-
-            return key
-        msg = "Key not found in response"
-        raise ValueError(msg)
-
-    except httpx.RequestError:
-        raise
-    except ValueError:
-        raise
-    except Exception:
-        raise
+    raise last_error
 
 
 def get_stream_info(content_id, service):
@@ -352,80 +359,76 @@ def main() -> None:
     stream_url, stream_type, has_drm = get_stream_info(content_id, service)
 
     if has_drm and stream_type == "dash":
-        pssh = get_pssh_from_mpd(stream_url)
+        pssh = get_pssh_from_mpd(stream_url, service)
         if pssh is None:
-            if service == "go3":
-                pssh = os.getenv("PSSH")
-                if pssh:
-                    pass
-                else:
-                    has_drm = False
+            # Try fallback to env PSSH for any service
+            pssh = os.getenv("PSSH")
+            if pssh:
+                pass
             else:
                 has_drm = False
 
-    if has_drm and not check_files_exist(title):
-        # DRM content - download encrypted files
-        video_format, audio_format = get_stream_formats(stream_url)
-
-        result_video = subprocess.run(
-            [
-                YTDLP_PATH,
-                "--allow-u",
-                "-f",
-                video_format,
-                stream_url,
-                "-o",
-                f"{title}.mp4",
-            ],
-            check=False,
-        )
-
-        if result_video.returncode != 0:
-            msg = "Failed to download video"
-            raise Exception(msg)
-
-        result_audio = subprocess.run(
-            [
-                YTDLP_PATH,
-                "--allow-u",
-                "-f",
-                audio_format,
-                stream_url,
-                "-o",
-                f"./{title}.m4a",
-            ],
-            check=False,
-        )
-
-        if result_audio.returncode != 0:
-            msg = "Failed to download audio"
-            raise Exception(msg)
-
+    if has_drm:
+        # DRM content - download encrypted files if needed
         if not check_files_exist(title):
-            msg = "Failed to download video and audio files"
-            raise Exception(msg)
+            video_format, audio_format = get_stream_formats(stream_url)
 
-        if has_drm:
-            if stream_type == "dash":
-                pssh = get_pssh_from_mpd(stream_url)
-            else:
-                pssh = os.getenv("PSSH")
-                if not pssh:
-                    msg = "PSSH required for non-DASH DRM"
-                    raise ValueError(msg)
-        else:
-            pssh = None  # Not needed for non-DRM
+            result_video = subprocess.run(
+                [
+                    YTDLP_PATH,
+                    "--allow-u",
+                    "-f",
+                    video_format,
+                    stream_url,
+                    "-o",
+                    f"{title}.mp4",
+                ],
+                check=False,
+            )
 
-        key = get_decryption_key(content_id, pssh, service)
-        decrypt_files(title, key)
-        mix_files(title)
+            if result_video.returncode != 0:
+                msg = "Failed to download video"
+                raise Exception(msg)
+
+            result_audio = subprocess.run(
+                [
+                    YTDLP_PATH,
+                    "--allow-u",
+                    "-f",
+                    audio_format,
+                    stream_url,
+                    "-o",
+                    f"./{title}.m4a",
+                ],
+                check=False,
+            )
+
+            if result_audio.returncode != 0:
+                msg = "Failed to download audio"
+                raise Exception(msg)
+
+            if not check_files_exist(title):
+                msg = "Failed to download video and audio files"
+                raise Exception(msg)
+
+        # Decrypt if not already done
+        if not check_dec_files_exist(title):
+            key = get_decryption_key(content_id, pssh, service)
+            decrypt_files(title, key)
+
+        # Mix if not already done
+        if not check_final_file_exists(title):
+            mix_files(title)
 
     elif not has_drm and not check_final_file_exists(title):
         # Non-DRM content - download and merge
+        # Prefer Estonian audio, fallback to English, avoid Russian
         result = subprocess.run(
             [
                 YTDLP_PATH,
                 "--allow-u",
+                "-f",
+                "bv*+ba[language=et]/bv*+ba[language=est]/bv*+ba[language=en]/bv*+ba[language=eng]/bv*+ba[language!=rus]/bv*+ba",
                 stream_url,
                 "-o",
                 f"{title}-temp.%(ext)s",
@@ -438,13 +441,15 @@ def main() -> None:
             raise Exception(msg)
 
         # Merge the downloaded video and audio files
-        video_files = glob.glob(f"{title}-temp.f*.mp4")
-        audio_files = glob.glob(f"{title}-temp.faudio*.mp4")
+        # Look for video files (may be named fvideo=... or just f...)
+        video_files = glob.glob(f"{title}-temp.fvideo*.mp4")
+        if not video_files:
+            video_files = glob.glob(f"{title}-temp.f*.mp4")
 
-        if not video_files or not audio_files:
-            # Try with the -final naming that was already used
-            video_files = glob.glob(f"{title}-final.f*.mp4")
-            audio_files = glob.glob(f"{title}-final.faudio*.mp4")
+        # Look for audio files (may have .m4a or .mp4 extension, may have language suffix)
+        audio_files = glob.glob(f"{title}-temp.faudio*.m4a")
+        if not audio_files:
+            audio_files = glob.glob(f"{title}-temp.faudio*.mp4")
 
         if not video_files or not audio_files:
             msg = "Could not find downloaded video or audio files"
