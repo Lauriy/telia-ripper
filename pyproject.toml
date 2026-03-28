@@ -1,15 +1,27 @@
 [project]
 name = "telia-ripper"
-version = "0.2.1"
+version = "0.2.2"
 description = "Tool for downloading and decrypting (Estonian) Telia/Go3 video streams"
 requires-python = ">=3.14"
 dependencies = [
+    "defusedxml",
     "httpx",
     "python-dotenv",
 ]
 [dependency-groups]
 dev = [
     "ruff",
+    "ty",
 ]
 [tool.ruff.lint]
 select = ["ALL"]
+ignore = [
+    "D",       # docstrings — code is self-explanatory
+    "S603",    # subprocess calls with variable input — expected for CLI tool
+    "S607",    # partial executable path — paths come from .env
+    "COM812",  # trailing comma — conflicts with formatter
+    "ISC001",  # implicit string concat — conflicts with formatter
+]
+
+[tool.ty.rules]
+all = "warn"

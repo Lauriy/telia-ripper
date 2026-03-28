@@ -2,6 +2,7 @@
 /.ruff_cache/
 /.venv/
 /.grok/
+/.claude/
 /.env
 /*.mp4
 /*.m4a

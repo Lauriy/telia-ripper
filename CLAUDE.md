@@ -5,7 +5,6 @@ Video stream ripper for Telia TV and Go3 (Widevine DRM).
 ## Setup
 ```bash
 uv venv && uv sync
-# Windows: .venv\Scripts\activate
 ```
 
 ## .env
@@ -21,14 +20,16 @@ FFMPEG_PATH=...
 
 ## Commands
 ```bash
-ruff check . --fix --unsafe-fixes && ruff format .
-python telia_ripper.py
+uv run ruff check . --fix --unsafe-fixes && uv run ruff format .  # lint
+uv run ty check                                                    # type check
+python telia_ripper.py                                             # run
 ```
 
 ## Flow
-1. Detect service from URL → get stream info from API
+1. Detect service from URL -> get stream info from API
 2. Extract PSSH from MPD (or use env fallback)
-3. Download encrypted → get key from CDM → decrypt → mux
+3. Download encrypted -> get key from CDRM Project API -> decrypt -> mux
+4. Non-DRM streams: download + mux directly
 
 ## Files
-`{title}.mp4/.m4a` → `{title}-dec.mp4/.m4a` → `{title}-final.mp4`
+`{title}.mp4/.m4a` -> `{title}-dec.mp4/.m4a` -> `{title}-final.mp4`

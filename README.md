@@ -7,11 +7,11 @@
 ```
 
 ```shell
-    ruff check . --fix --unsafe-fixes
+    uv run ruff check . --fix --unsafe-fixes
 ```
 
 ```shell
-    ruff format .
+    uv run ruff format .
 ```
 
 Fill in .env and then:
