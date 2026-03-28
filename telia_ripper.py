@@ -34,6 +34,7 @@ GO3_COOKIE_NAME = "JSESSIONID"
 GO3_SESSION_ENV = "GO3_SESSION_ID"
 
 # Widevine / MPD XML constants
+EXPECTED_KEY_PARTS = 2  # KID:KEY format
 WIDEVINE_SCHEME_URI = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
 MPD_NS = "{urn:mpeg:dash:schema:mpd:2011}"
 CENC_NS = "{urn:mpeg:cenc:2013}"
@@ -147,6 +148,7 @@ def get_pssh_from_mpd(stream_url: str, service: str) -> str | None:
     else:
         session = os.environ.get(TELIA_SESSION_ENV, "")
         headers = {"Cookie": f"{TELIA_COOKIE_NAME}={session}"}
+
     response = httpx.get(stream_url, headers=headers)
     if response.status_code == httpx.codes.FOUND:
         location = response.headers.get("Location")
@@ -218,7 +220,8 @@ def get_decryption_key(
 
             for raw_line in message.strip().split("\n"):
                 stripped = raw_line.strip()
-                if ":" in stripped and len(stripped.split(":")) == 2:  # noqa: PLR2004
+                parts = stripped.split(":")
+                if len(parts) == EXPECTED_KEY_PARTS:
                     return stripped
 
             msg = f"No valid key found in response: {message}"
@@ -283,6 +286,7 @@ def _get_go3_stream_info(content_id: str) -> tuple[str, str, bool]:
         f"?platform=BROWSER&videoType=MOVIE&lang=ET&tenant=OM_EE"
     )
     response = httpx.get(playlist_url, headers=headers)
+
     if response.status_code != httpx.codes.OK:
         msg = f"Failed to fetch playlist: {response.status_code}"
         raise RipperError(msg)
@@ -313,6 +317,7 @@ def _is_english_audio(format_id: str, line: str) -> bool:
 def _parse_video_bitrate(line: str) -> int | None:
     try:
         tbr = line.split("|")[1].strip().split("k")[0]
+
         return int(tbr)
     except (ValueError, IndexError):
         return None
@@ -367,6 +372,7 @@ def get_stream_formats(stream_url: str) -> tuple[str, str]:
 
     best_video = max(video_formats)[1]
     audio = audio_est or audio_eng
+
     if not audio:
         msg = "Could not find audio format"
         raise ValueError(msg)
