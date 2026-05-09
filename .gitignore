@@ -4,5 +4,6 @@
 /.grok/
 /.claude/
 /.env
+/.wvd/
 /*.mp4
 /*.m4a

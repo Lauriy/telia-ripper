@@ -1,22 +1,24 @@
 import contextlib
 import os
 import subprocess
-import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
 from defusedxml.ElementTree import fromstring as parse_xml
 from dotenv import load_dotenv
+from pywidevine.cdm import Cdm
+from pywidevine.device import Device
+from pywidevine.pssh import PSSH
 
 load_dotenv(override=True)
 
 YTDLP_PATH = os.environ.get("YTDLP_PATH", "yt-dlp")
 MP4DECRYPT_PATH = os.environ.get("MP4DECRYPT_PATH", "mp4decrypt")
 FFMPEG_PATH = os.environ.get("FFMPEG_PATH", "ffmpeg")
+WVD_PATH = os.environ.get("WVD_PATH", ".wvd/device.wvd")
 API_BASE_URL = "https://api.teliatv.ee"
 GO3_API_BASE_URL = "https://go3.tv"
-CDRM_API_URL = "https://cdrm-project.com/api/decrypt"
 
 # Service identifiers
 SERVICE_TELIA = "telia"
@@ -34,7 +36,6 @@ GO3_COOKIE_NAME = "JSESSIONID"
 GO3_SESSION_ENV = "GO3_SESSION_ID"
 
 # Widevine / MPD XML constants
-EXPECTED_KEY_PARTS = 2  # KID:KEY format
 WIDEVINE_SCHEME_URI = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
 MPD_NS = "{urn:mpeg:dash:schema:mpd:2011}"
 CENC_NS = "{urn:mpeg:cenc:2013}"
@@ -168,16 +169,7 @@ def get_pssh_from_mpd(stream_url: str, service: str) -> str | None:
     return None
 
 
-def get_decryption_key(
-    content_id: str,
-    pssh: str,
-    service: str,
-    retries: int = 3,
-) -> str:
-    headers = {
-        "Content-Type": "application/json",
-    }
-
+def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
     if service == SERVICE_TELIA:
         license_url = (
             f"{API_BASE_URL}/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}"
@@ -195,45 +187,26 @@ def get_decryption_key(
         msg = f"Unsupported service: {service}"
         raise ValueError(msg)
 
-    payload = {
-        "pssh": pssh,
-        "licurl": license_url,
-        "headers": str({"Cookie": session_cookie}),
-    }
+    cdm = Cdm.from_device(Device.load(WVD_PATH))
+    session_id = cdm.open()
+    try:
+        challenge = cdm.get_license_challenge(session_id, PSSH(pssh))
+        response = httpx.post(
+            license_url,
+            headers={"Cookie": session_cookie},
+            content=challenge,
+        )
+        response.raise_for_status()
+        cdm.parse_license(session_id, response.content)
 
-    last_error: httpx.RequestError | ValueError = ValueError("No attempts made")
-    for attempt in range(retries):
-        try:
-            response = httpx.post(
-                CDRM_API_URL,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        for key in cdm.get_keys(session_id):
+            if key.type == "CONTENT":
+                return f"{key.kid.hex}:{key.key.hex()}"
 
-            data = response.json()
-            message: str = data.get("message", "")
-
-            if not message:
-                msg = "Empty response from CDRM"
-                raise ValueError(msg)  # noqa: TRY301
-
-            for raw_line in message.strip().split("\n"):
-                stripped = raw_line.strip()
-                parts = stripped.split(":")
-                if len(parts) == EXPECTED_KEY_PARTS:
-                    return stripped
-
-            msg = f"No valid key found in response: {message}"
-            raise ValueError(msg)  # noqa: TRY301
-
-        except (httpx.RequestError, ValueError) as e:
-            last_error = e
-            if attempt < retries - 1:
-                time.sleep(2)
-            continue
-
-    raise last_error
+        msg = "No CONTENT key in license response"
+        raise RipperError(msg)
+    finally:
+        cdm.close(session_id)
 
 
 def get_stream_info(content_id: str, service: str) -> tuple[str, str, bool]:
@@ -319,7 +292,7 @@ def _parse_video_bitrate(line: str) -> int | None:
         tbr = line.split("|")[1].strip().split("k")[0]
 
         return int(tbr)
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         return None
 
 
