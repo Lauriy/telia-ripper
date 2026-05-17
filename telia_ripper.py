@@ -37,6 +37,7 @@ GO3_SESSION_ENV = "GO3_SESSION_ID"
 
 # Widevine / MPD XML constants
 WIDEVINE_SCHEME_URI = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
+MP4_PROTECTION_SCHEME_URI = "urn:mpeg:dash:mp4protection:2011"
 MPD_NS = "{urn:mpeg:dash:schema:mpd:2011}"
 CENC_NS = "{urn:mpeg:cenc:2013}"
 
@@ -142,6 +143,30 @@ def mix_files(title: str) -> None:
         raise RipperError(msg)
 
 
+def _pssh_from_mpd_text(mpd_text: str) -> str | None:
+    root = parse_xml(mpd_text)
+    for cp in root.iter(f"{MPD_NS}ContentProtection"):
+        if cp.get("schemeIdUri") == WIDEVINE_SCHEME_URI:
+            for pssh_elem in cp.iter(f"{CENC_NS}pssh"):
+                return pssh_elem.text
+
+    # Telia's MPDs commonly omit the inline <cenc:pssh> and only set a
+    # cenc:default_KID on the generic mp4protection ContentProtection.
+    # Build a minimal Widevine PSSH from the KID — pywidevine + Telia accept it.
+    for cp in root.iter(f"{MPD_NS}ContentProtection"):
+        if cp.get("schemeIdUri") == MP4_PROTECTION_SCHEME_URI:
+            kid = cp.get(f"{CENC_NS}default_KID")
+            if kid:
+                kid_bytes = bytes.fromhex(kid.replace("-", ""))
+                return PSSH.new(
+                    system_id=PSSH.SystemId.Widevine,
+                    key_ids=[kid_bytes],
+                    version=0,
+                ).dumps()
+
+    return None
+
+
 def get_pssh_from_mpd(stream_url: str, service: str) -> str | None:
     if service == SERVICE_GO3:
         session = os.environ.get(GO3_SESSION_ENV, "")
@@ -159,14 +184,7 @@ def get_pssh_from_mpd(stream_url: str, service: str) -> str | None:
     if response.status_code != httpx.codes.OK:
         return None
 
-    root = parse_xml(response.text)
-
-    for cp in root.iter(f"{MPD_NS}ContentProtection"):
-        if cp.get("schemeIdUri") == WIDEVINE_SCHEME_URI:
-            for pssh_elem in cp.iter(f"{CENC_NS}pssh"):
-                return pssh_elem.text
-
-    return None
+    return _pssh_from_mpd_text(response.text)
 
 
 def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
@@ -175,14 +193,19 @@ def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
             f"{API_BASE_URL}/dtv-api/3.0/et/drm-license/widevine/vod_asset/{content_id}"
         )
         session = os.environ.get(TELIA_SESSION_ENV, "")
-        session_cookie = f"{TELIA_COOKIE_NAME}={session}"
+        # x-axdrm-message header is required by Axinom DRM (the value is a placeholder
+        # — Telia's frontend hardcodes literal "mingitoken" base64'd).
+        request_headers = {
+            "Cookie": f"{TELIA_COOKIE_NAME}={session}",
+            "x-axdrm-message": "bWluZ2l0b2tlbg==",
+        }
     elif service == SERVICE_GO3:
         license_url = (
             f"{GO3_API_BASE_URL}/api/products/{content_id}"
             f"/drm/widevine?platform=BROWSER&type=MOVIE&tenant=OM_EE"
         )
         session = os.environ.get(GO3_SESSION_ENV, "")
-        session_cookie = f"{GO3_COOKIE_NAME}={session}"
+        request_headers = {"Cookie": f"{GO3_COOKIE_NAME}={session}"}
     else:
         msg = f"Unsupported service: {service}"
         raise ValueError(msg)
@@ -191,11 +214,7 @@ def get_decryption_key(content_id: str, pssh: str, service: str) -> str:
     session_id = cdm.open()
     try:
         challenge = cdm.get_license_challenge(session_id, PSSH(pssh))
-        response = httpx.post(
-            license_url,
-            headers={"Cookie": session_cookie},
-            content=challenge,
-        )
+        response = httpx.post(license_url, headers=request_headers, content=challenge)
         response.raise_for_status()
         cdm.parse_license(session_id, response.content)
 
@@ -486,9 +505,7 @@ def main() -> None:
     if has_drm and stream_type == STREAM_DASH:
         pssh = get_pssh_from_mpd(stream_url, service)
         if pssh is None:
-            pssh = os.environ.get("PSSH")
-            if not pssh:
-                has_drm = False
+            has_drm = False
 
     if has_drm and pssh:
         _download_drm_content(title, stream_url, content_id, pssh, service)

@@ -19,7 +19,6 @@ Fill in `.env`:
 URL=https://teliatv.ee/... or https://go3.tv/...
 SESSION_ID=<Telia PHPSESSID cookie value>
 GO3_SESSION_ID=<Go3 JSESSIONID cookie value>
-PSSH=<optional fallback if MPD doesn't carry one>
 WVD_PATH=.wvd/device.wvd
 YTDLP_PATH=path/to/yt-dlp
 MP4DECRYPT_PATH=path/to/mp4decrypt
@@ -28,19 +27,7 @@ FFMPEG_PATH=path/to/ffmpeg
 
 You also need a Widevine `.wvd` device blob at `WVD_PATH`. See **Getting a .wvd** below.
 
-To grab the PSSH from a Telia/Go3 player page, paste this into DevTools console *before* clicking play:
-
-```javascript
-const orig = MediaKeySession.prototype.generateRequest;
-MediaKeySession.prototype.generateRequest = function (initDataType, initData) {
-    if (initData instanceof ArrayBuffer) {
-        const arr = new Uint8Array(initData);
-        const b64 = btoa(String.fromCharCode.apply(null, arr));
-        console.log("initData (base64):", b64);
-    }
-    return orig.call(this, initDataType, initData);
-};
-```
+The session cookies are easy to grab: DevTools (F12) → Application/Storage → Cookies → `https://www.teliatv.ee` (or `https://go3.tv`) → copy the value of `PHPSESSID` (or `JSESSIONID`).
 
 ## Run
 
